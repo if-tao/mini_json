@@ -1,68 +1,97 @@
-#include <assert.h>
-#include <stdlib.h>
 #include "mini_json.h"
+#include <assert.h>  /* assert() */
+#include <errno.h>   /* errno, ERANGE */
+#include <math.h>    /* HUGE_VAL */
+#include <stdlib.h>  /* NULL, strtod() */
 
+#define EXPECT(c, ch)       do { assert(*c->json == (ch)); c->json++; } while(0)
+#define ISDIGIT(ch)         ((ch) >= '0' && (ch) <= '9')
+#define ISDIGIT1TO9(ch)     ((ch) >= '1' && (ch) <= '9')
 
-int mini_parse(mini_value *v,const char *json){
+typedef struct {
+    const char* json;
+}mini_context;
+
+static void mini_parse_whitespace(mini_context* c) {
+    const char *p = c->json;
+    while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')
+        p++;
+    c->json = p;
+}
+
+static int mini_parse_literal(mini_context* c, mini_value* v, const char* literal, mini_type type) {
+    size_t i;
+    EXPECT(c, literal[0]);
+    for (i = 0; literal[i + 1]; i++)
+        if (c->json[i] != literal[i + 1])
+            return MINI_PARSE_INVALID_VALUE;
+    c->json += i;
+    v->type = type;
+    return MINI_PARSE_OK;
+}
+
+static int mini_parse_number(mini_context* c, mini_value* v) {
+    const char* p = c->json;
+    if(*p == '-') ++p;
+    if(*p == '0') ++p;
+    else{
+        if(!ISDIGIT1TO9(*p)) return MINI_PARSE_INVALID_VALUE;
+        for(++p; ISDIGIT(*p); ++p);
+    }
+    if(*p == '.'){
+        ++p;
+        if(!ISDIGIT(*p)) return MINI_PARSE_INVALID_VALUE;
+        for(++p; ISDIGIT(*p); ++p);
+    }
+    if(*p == 'e' || *p == 'E'){
+        ++p;
+        if(*p == '+' || *p == '-') ++p;
+        if(!ISDIGIT(*p)) return MINI_PARSE_INVALID_VALUE;
+        for(++p; ISDIGIT(*p); ++p);
+    }
+
+    errno = 0;
+    v->n = strtod(c->json, NULL);
+    if(errno == ERANGE && (v->n == HUGE_VAL || v->n == -HUGE_VAL))
+        return MINI_PARSE_NUMBER_TOO_BIG;
+    c->json = p;
+    v->type = MINI_NUMBER;
+    return MINI_PARSE_OK;
+}
+
+static int mini_parse_value(mini_context* c, mini_value* v) {
+    switch (*c->json) {
+        case 't':  return mini_parse_literal(c, v, "true", MINI_TRUE);
+        case 'f':  return mini_parse_literal(c, v, "false", MINI_FALSE);
+        case 'n':  return mini_parse_literal(c, v, "null", MINI_NULL);
+        default:   return mini_parse_number(c, v);
+        case '\0': return MINI_PARSE_EXPECT_VALUE;
+    }
+}
+
+int mini_parse(mini_value* v, const char* json) {
     mini_context c;
     int ret;
     assert(v != NULL);
     c.json = json;
     v->type = MINI_NULL;
     mini_parse_whitespace(&c);
-    if((ret == mini_parse_value(&c, v)) == MINI_PARSE_OK) {
-	    mini_parse_whitespace(&c);
-	    if(*c.json != '\0')
-	    	ret = MINI_PARSE_ROOT_NOT_SINGULAR;
+    if ((ret = mini_parse_value(&c, v)) == MINI_PARSE_OK) {
+        mini_parse_whitespace(&c);
+        if (*c.json != '\0') {
+            v->type = MINI_NULL;
+            ret = MINI_PARSE_ROOT_NOT_SINGULAR;
+        }
     }
     return ret;
 }
 
-mini_type mini_get_type(const mini_value *v) {
-	assert(v != NULL);
-	return v->type;
+mini_type mini_get_type(const mini_value* v) {
+    assert(v != NULL);
+    return v->type;
 }
 
-static void mini_parse_whitespace(mini_context* c){
-    const char *p = c->json;
-    while(*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')
-        p++;
-    c->json = p;
-}
-
-static int mini_parse_null(mini_context* c, mini_value* v){
-   EXPECT(c,'n');
-   if(c->json[0] != 'u' || c->json[1] != 'l' || c->json[2] != 'l')
-       return MINI_PARSE_INVALID_VALUE;
-   c->json += 3;
-   v->type = MINI_NULL;
-   return MINI_PARSE_OK;
-}
-
-static int mini_parse_false(mini_context* c, mini_value* v){
-   EXPECT(c,'f');
-   if(c->json[0] != 'a' || c->json[1] != 'l' || c->json[2] != 's' || c->json[3] != 'e')
-       return MINI_PARSE_INVALID_VALUE;
-   c->json += 4;
-   v->type = MINI_FALSE;
-   return MINI_PARSE_OK;
-}
-
-static int mini_parse_true(mini_context* c, mini_value* v){
-   EXPECT(c,'t');
-   if(c->json[0] != 'r' || c->json[1] != 'u' || c->json[2] != 'e')
-       return MINI_PARSE_INVALID_VALUE;
-   c->json += 3;
-   v->type = MINI_TRUE;
-   return MINI_PARSE_OK;
-}
-
-static int mini_parse_value(mini_context* c,mini_value* v){
-    switch(*c->json){
-	    case 't' : return mini_parse_true(c, v);
-	    case 'f' : return mini_parse_false(c, v);
-        case 'n' : return mini_parse_null(c, v);
-        case '\0' : return MINI_PARSE_EXPECT_VALUE;
-        defalult : return MINI_PARSE_INVALID_VALUE;
-    }
+double mini_get_number(const mini_value* v) {
+    assert(v != NULL && v->type == MINI_NUMBER);
+    return v->n;
 }
