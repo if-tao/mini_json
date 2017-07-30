@@ -20,34 +20,73 @@ static int test_pass = 0;
 
 #define EXPECT_EQ_INT(expect, actual) EXPECT_EQ_BASE((expect) == (actual), expect, actual, "%d")
 #define EXPECT_EQ_DOUBLE(expect, actual) EXPECT_EQ_BASE((expect) == (actual), expect, actual, "%.17g")
+<<<<<<< HEAD
 
 static void test_parse_null() {
     mini_value v;
     v.type = MINI_FALSE;
     EXPECT_EQ_INT(MINI_PARSE_OK, mini_parse(&v, "null"));
     EXPECT_EQ_INT(MINI_NULL, mini_get_type(&v));
+=======
+#define EXPECT_EQ_STRING(expect, actual, alength) \
+    EXPECT_EQ_BASE(sizeof(expect) - 1 == alength && memcmp(expect, actual, alength) == 0, expect, actual, "%s")
+#define EXPECT_TRUE(actual) EXPECT_EQ_BASE((actual) != 0, "true", "false", "%s")
+#define EXPECT_FALSE(actual) EXPECT_EQ_BASE((actual) == 0, "false", "true", "%s")
+
+static void test_parse_null() {
+    mini_value v;
+    mini_init(&v);
+    mini_set_boolean(&v, 0);
+    EXPECT_EQ_INT(MINI_PARSE_OK, mini_parse(&v, "null"));
+    EXPECT_EQ_INT(MINI_NULL, mini_get_type(&v));
+    mini_free(&v);
+>>>>>>> develop
 }
 
 static void test_parse_true() {
     mini_value v;
+<<<<<<< HEAD
     v.type = MINI_FALSE;
     EXPECT_EQ_INT(MINI_PARSE_OK, mini_parse(&v, "true"));
     EXPECT_EQ_INT(MINI_TRUE, mini_get_type(&v));
+=======
+    mini_init(&v);
+    mini_set_boolean(&v, 0);
+    EXPECT_EQ_INT(MINI_PARSE_OK, mini_parse(&v, "true"));
+    EXPECT_EQ_INT(MINI_TRUE, mini_get_type(&v));
+    mini_free(&v);
+>>>>>>> develop
 }
 
 static void test_parse_false() {
     mini_value v;
+<<<<<<< HEAD
     v.type = MINI_TRUE;
     EXPECT_EQ_INT(MINI_PARSE_OK, mini_parse(&v, "false"));
     EXPECT_EQ_INT(MINI_FALSE, mini_get_type(&v));
+=======
+    mini_init(&v);
+    mini_set_boolean(&v, 1);
+    EXPECT_EQ_INT(MINI_PARSE_OK, mini_parse(&v, "false"));
+    EXPECT_EQ_INT(MINI_FALSE, mini_get_type(&v));
+    mini_free(&v);
+>>>>>>> develop
 }
 
 #define TEST_NUMBER(expect, json)\
     do {\
         mini_value v;\
+<<<<<<< HEAD
         EXPECT_EQ_INT(MINI_PARSE_OK, mini_parse(&v, json));\
         EXPECT_EQ_INT(MINI_NUMBER, mini_get_type(&v));\
         EXPECT_EQ_DOUBLE(expect, mini_get_number(&v));\
+=======
+        mini_init(&v);\
+        EXPECT_EQ_INT(MINI_PARSE_OK, mini_parse(&v, json));\
+        EXPECT_EQ_INT(MINI_NUMBER, mini_get_type(&v));\
+        EXPECT_EQ_DOUBLE(expect, mini_get_number(&v));\
+        mini_free(&v);\
+>>>>>>> develop
     } while(0)
 
 static void test_parse_number() {
@@ -82,12 +121,40 @@ static void test_parse_number() {
     TEST_NUMBER(-1.7976931348623157e+308, "-1.7976931348623157e+308");
 }
 
+<<<<<<< HEAD
 #define TEST_ERROR(error, json)\
     do {\
         mini_value v;\
         v.type = MINI_FALSE;\
         EXPECT_EQ_INT(error, mini_parse(&v, json));\
         EXPECT_EQ_INT(MINI_NULL, mini_get_type(&v));\
+=======
+#define TEST_STRING(expect, json)\
+    do {\
+        mini_value v;\
+        mini_init(&v);\
+        EXPECT_EQ_INT(MINI_PARSE_OK, mini_parse(&v, json));\
+        EXPECT_EQ_INT(MINI_STRING, mini_get_type(&v));\
+        EXPECT_EQ_STRING(expect, mini_get_string(&v), mini_get_string_length(&v));\
+        mini_free(&v);\
+    } while(0)
+
+static void test_parse_string() {
+    TEST_STRING("", "\"\"");
+    TEST_STRING("Hello", "\"Hello\"");
+    TEST_STRING("Hello\nWorld", "\"Hello\\nWorld\"");
+    TEST_STRING("\" \\ / \b \f \n \r \t", "\"\\\" \\\\ \\/ \\b \\f \\n \\r \\t\"");
+}
+
+#define TEST_ERROR(error, json)\
+    do {\
+        mini_value v;\
+        mini_init(&v);\
+        v.type = MINI_FALSE;\
+        EXPECT_EQ_INT(error, mini_parse(&v, json));\
+        EXPECT_EQ_INT(MINI_NULL, mini_get_type(&v));\
+        mini_free(&v);\
+>>>>>>> develop
     } while(0)
 
 static void test_parse_expect_value() {
@@ -124,18 +191,98 @@ static void test_parse_number_too_big() {
     TEST_ERROR(MINI_PARSE_NUMBER_TOO_BIG, "-1e309");
 }
 
+<<<<<<< HEAD
+=======
+static void test_parse_missing_quotation_mark() {
+    TEST_ERROR(MINI_PARSE_MISS_QUOTATION_MARK, "\"");
+    TEST_ERROR(MINI_PARSE_MISS_QUOTATION_MARK, "\"abc");
+}
+
+static void test_parse_invalid_string_escape() {
+    TEST_ERROR(MINI_PARSE_INVALID_STRING_ESCAPE, "\"\\v\"");
+    TEST_ERROR(MINI_PARSE_INVALID_STRING_ESCAPE, "\"\\'\"");
+    TEST_ERROR(MINI_PARSE_INVALID_STRING_ESCAPE, "\"\\0\"");
+    TEST_ERROR(MINI_PARSE_INVALID_STRING_ESCAPE, "\"\\x12\"");
+}
+
+static void test_parse_invalid_string_char() {
+    TEST_ERROR(MINI_PARSE_INVALID_STRING_CHAR, "\"\x01\"");
+    TEST_ERROR(MINI_PARSE_INVALID_STRING_CHAR, "\"\x1F\"");
+}
+
+static void test_access_null() {
+    mini_value v;
+    mini_init(&v);
+    mini_set_string(&v, "a", 1);
+    mini_set_null(&v);
+    EXPECT_EQ_INT(MINI_NULL, mini_get_type(&v));
+    mini_free(&v);
+}
+
+static void test_access_boolean() {
+    mini_value v;
+    mini_init(&v);
+    mini_set_string(&v, "a", 1);
+    mini_set_boolean(&v, 1);
+    EXPECT_TRUE(mini_get_boolean(&v));
+    mini_set_boolean(&v, 0);
+    EXPECT_FALSE(mini_get_boolean(&v));
+    mini_free(&v);
+}
+
+static void test_access_number() {
+    mini_value v;
+    mini_init(&v);
+    mini_set_string(&v, "a", 1);
+    mini_set_number(&v, 1234.5);
+    EXPECT_EQ_DOUBLE(1234.5, mini_get_number(&v));
+    mini_free(&v);
+}
+
+static void test_access_string() {
+    mini_value v;
+    mini_init(&v);
+    mini_set_string(&v, "", 0);
+    EXPECT_EQ_STRING("", mini_get_string(&v), mini_get_string_length(&v));
+    mini_set_string(&v, "Hello", 5);
+    EXPECT_EQ_STRING("Hello", mini_get_string(&v), mini_get_string_length(&v));
+    mini_free(&v);
+}
+
+>>>>>>> develop
 static void test_parse() {
     test_parse_null();
     test_parse_true();
     test_parse_false();
     test_parse_number();
+<<<<<<< HEAD
+=======
+    test_parse_string();
+>>>>>>> develop
     test_parse_expect_value();
     test_parse_invalid_value();
     test_parse_root_not_singular();
     test_parse_number_too_big();
+<<<<<<< HEAD
 }
 
 int main() {
+=======
+    test_parse_missing_quotation_mark();
+    test_parse_invalid_string_escape();
+    test_parse_invalid_string_char();
+
+    test_access_null();
+    test_access_boolean();
+    test_access_number();
+    test_access_string();
+}
+
+int main() {
+#ifdef _WINDOWS
+    _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+#endif
+>>>>>>> develop
     test_parse();
     printf("%d/%d (%3.2f%%) passed\n", test_pass, test_count, test_pass * 100.0 / test_count);
     return main_ret;
