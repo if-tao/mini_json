@@ -2,36 +2,16 @@
 #include <assert.h>  /* assert() */
 #include <errno.h>   /* errno, ERANGE */
 #include <math.h>    /* HUGE_VAL */
-<<<<<<< HEAD
-<<<<<<< HEAD
-#include <stdlib.h>  /* NULL, strtod() */
-=======
-=======
->>>>>>> develop
 #include <stdlib.h>  /* NULL, malloc(), realloc(), free(), strtod() */
 #include <string.h>  /* memcpy() */
 
 #ifndef MINI_PARSE_STACK_INIT_SIZE
 #define MINI_PARSE_STACK_INIT_SIZE 256
 #endif
-<<<<<<< HEAD
->>>>>>> develop
-=======
->>>>>>> develop
 
 #define EXPECT(c, ch)       do { assert(*c->json == (ch)); c->json++; } while(0)
 #define ISDIGIT(ch)         ((ch) >= '0' && (ch) <= '9')
 #define ISDIGIT1TO9(ch)     ((ch) >= '1' && (ch) <= '9')
-<<<<<<< HEAD
-<<<<<<< HEAD
-
-typedef struct {
-    const char* json;
-}mini_context;
-
-=======
-=======
->>>>>>> develop
 #define PUTC(c, ch)         do { *(char*)mini_context_push(c, sizeof(char)) = (ch); } while(0)
 
 typedef struct {
@@ -60,10 +40,6 @@ static void* mini_context_pop(mini_context* c, size_t size) {
     return c->stack + (c->top -= size);
 }
 
-<<<<<<< HEAD
->>>>>>> develop
-=======
->>>>>>> develop
 static void mini_parse_whitespace(mini_context* c) {
     const char *p = c->json;
     while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')
@@ -84,38 +60,6 @@ static int mini_parse_literal(mini_context* c, mini_value* v, const char* litera
 
 static int mini_parse_number(mini_context* c, mini_value* v) {
     const char* p = c->json;
-<<<<<<< HEAD
-<<<<<<< HEAD
-    if(*p == '-') ++p;
-    if(*p == '0') ++p;
-    else{
-        if(!ISDIGIT1TO9(*p)) return MINI_PARSE_INVALID_VALUE;
-        for(++p; ISDIGIT(*p); ++p);
-    }
-    if(*p == '.'){
-        ++p;
-        if(!ISDIGIT(*p)) return MINI_PARSE_INVALID_VALUE;
-        for(++p; ISDIGIT(*p); ++p);
-    }
-    if(*p == 'e' || *p == 'E'){
-        ++p;
-        if(*p == '+' || *p == '-') ++p;
-        if(!ISDIGIT(*p)) return MINI_PARSE_INVALID_VALUE;
-        for(++p; ISDIGIT(*p); ++p);
-    }
-
-    errno = 0;
-    v->n = strtod(c->json, NULL);
-    if(errno == ERANGE && (v->n == HUGE_VAL || v->n == -HUGE_VAL))
-        return MINI_PARSE_NUMBER_TOO_BIG;
-    c->json = p;
-    v->type = MINI_NUMBER;
-    return MINI_PARSE_OK;
-}
-
-=======
-=======
->>>>>>> develop
     if (*p == '-') p++;
     if (*p == '0') p++;
     else {
@@ -142,51 +86,46 @@ static int mini_parse_number(mini_context* c, mini_value* v) {
     return MINI_PARSE_OK;
 }
 
-<<<<<<< HEAD
-static int mini_parse_string(mini_context* c, mini_value* v) {
-    size_t head = c->top, len;
-=======
 static const char* mini_parse_hex4(const char* p, unsigned int* u) {
     int i;
     *u = 0;
-    for(i = 0; i<4; ++i){
+    for (i = 0; i < 4; i++) {
         char ch = *p++;
         *u <<= 4;
-        if      (ch >= '0' && ch <= '9') *u |= ch - '0';
-        else if (ch >= 'a' && ch <= 'f') *u |= ch - ('a' - 10);
-        else if (ch >= 'A' && ch <= 'F') *u |= ch - ('A' - 10);
-        else    return NULL;
+        if      (ch >= '0' && ch <= '9')  *u |= ch - '0';
+        else if (ch >= 'A' && ch <= 'F')  *u |= ch - ('A' - 10);
+        else if (ch >= 'a' && ch <= 'f')  *u |= ch - ('a' - 10);
+        else return NULL;
     }
     return p;
 }
 
-static void mini_encode_utf8(mini_context* c, unsigned int u){
-    if(u <= 0x7F)
+static void mini_encode_utf8(mini_context* c, unsigned int u) {
+    if (u <= 0x7F) 
         PUTC(c, u & 0xFF);
-    else if(u <= 0x7FF) {
+    else if (u <= 0x7FF) {
         PUTC(c, 0xC0 | ((u >> 6) & 0xFF));
         PUTC(c, 0x80 | ( u       & 0x3F));
     }
-    else if(u <= 0xFFFF) {
+    else if (u <= 0xFFFF) {
         PUTC(c, 0xE0 | ((u >> 12) & 0xFF));
-        PUTC(c, 0x80 | ((u >> 6)  & 0x3F));
+        PUTC(c, 0x80 | ((u >>  6) & 0x3F));
         PUTC(c, 0x80 | ( u        & 0x3F));
     }
     else {
         assert(u <= 0x10FFFF);
-         PUTC(c, 0xF0 | ((u >> 18) & 0xFF));
-         PUTC(c, 0x80 | ((u >> 12) & 0x3F));
-         PUTC(c, 0x80 | ((u >>  6) & 0x3F));
-         PUTC(c, 0x80 | ( u        & 0x3F));
+        PUTC(c, 0xF0 | ((u >> 18) & 0xFF));
+        PUTC(c, 0x80 | ((u >> 12) & 0x3F));
+        PUTC(c, 0x80 | ((u >>  6) & 0x3F));
+        PUTC(c, 0x80 | ( u        & 0x3F));
     }
 }
 
-
 #define STRING_ERROR(ret) do { c->top = head; return ret; } while(0)
+
 static int mini_parse_string(mini_context* c, mini_value* v) {
     size_t head = c->top, len;
     unsigned int u, u2;
->>>>>>> develop
     const char* p;
     EXPECT(c, '\"');
     p = c->json;
@@ -208,31 +147,17 @@ static int mini_parse_string(mini_context* c, mini_value* v) {
                     case 'n':  PUTC(c, '\n'); break;
                     case 'r':  PUTC(c, '\r'); break;
                     case 't':  PUTC(c, '\t'); break;
-<<<<<<< HEAD
-                    default:
-                        c->top = head;
-                        return MINI_PARSE_INVALID_STRING_ESCAPE;
-                }
-                break;
-            case '\0':
-                c->top = head;
-                return MINI_PARSE_MISS_QUOTATION_MARK;
-            default:
-                if ((unsigned char)ch < 0x20) { 
-                    c->top = head;
-                    return MINI_PARSE_INVALID_STRING_CHAR;
-=======
                     case 'u':
-                        if(!(p = mini_parse_hex4(p, &u)))
-                           STRING_ERROR(MINI_PARSE_INVALID_UNICODE_HEX);
-                        if(u >= 0xD800 && u <= 0xDBFF) {
-                            if(*p++ != '\\')
+                        if (!(p = mini_parse_hex4(p, &u)))
+                            STRING_ERROR(MINI_PARSE_INVALID_UNICODE_HEX);
+                        if (u >= 0xD800 && u <= 0xDBFF) { /* surrogate pair */
+                            if (*p++ != '\\')
                                 STRING_ERROR(MINI_PARSE_INVALID_UNICODE_SURROGATE);
-                            if(*p++ != 'u')
+                            if (*p++ != 'u')
                                 STRING_ERROR(MINI_PARSE_INVALID_UNICODE_SURROGATE);
-                            if(!(p = mini_parse_hex4(p, &u2)))
+                            if (!(p = mini_parse_hex4(p, &u2)))
                                 STRING_ERROR(MINI_PARSE_INVALID_UNICODE_HEX);
-                            if(u2 < 0xDC00 || u2 > 0xDFFF)
+                            if (u2 < 0xDC00 || u2 > 0xDFFF)
                                 STRING_ERROR(MINI_PARSE_INVALID_UNICODE_SURROGATE);
                             u = (((u - 0xD800) << 10) | (u2 - 0xDC00)) + 0x10000;
                         }
@@ -245,33 +170,20 @@ static int mini_parse_string(mini_context* c, mini_value* v) {
             case '\0':
                 STRING_ERROR(MINI_PARSE_MISS_QUOTATION_MARK);
             default:
-                if ((unsigned char)ch < 0x20) { 
+                if ((unsigned char)ch < 0x20)
                     STRING_ERROR(MINI_PARSE_INVALID_STRING_CHAR);
->>>>>>> develop
-                }
                 PUTC(c, ch);
         }
     }
 }
 
-<<<<<<< HEAD
->>>>>>> develop
-=======
->>>>>>> develop
 static int mini_parse_value(mini_context* c, mini_value* v) {
     switch (*c->json) {
         case 't':  return mini_parse_literal(c, v, "true", MINI_TRUE);
         case 'f':  return mini_parse_literal(c, v, "false", MINI_FALSE);
         case 'n':  return mini_parse_literal(c, v, "null", MINI_NULL);
         default:   return mini_parse_number(c, v);
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
         case '"':  return mini_parse_string(c, v);
->>>>>>> develop
-=======
-        case '"':  return mini_parse_string(c, v);
->>>>>>> develop
         case '\0': return MINI_PARSE_EXPECT_VALUE;
     }
 }
@@ -281,19 +193,9 @@ int mini_parse(mini_value* v, const char* json) {
     int ret;
     assert(v != NULL);
     c.json = json;
-<<<<<<< HEAD
-<<<<<<< HEAD
-    v->type = MINI_NULL;
-=======
     c.stack = NULL;
     c.size = c.top = 0;
     mini_init(v);
->>>>>>> develop
-=======
-    c.stack = NULL;
-    c.size = c.top = 0;
-    mini_init(v);
->>>>>>> develop
     mini_parse_whitespace(&c);
     if ((ret = mini_parse_value(&c, v)) == MINI_PARSE_OK) {
         mini_parse_whitespace(&c);
@@ -302,14 +204,6 @@ int mini_parse(mini_value* v, const char* json) {
             ret = MINI_PARSE_ROOT_NOT_SINGULAR;
         }
     }
-<<<<<<< HEAD
-<<<<<<< HEAD
-    return ret;
-}
-
-=======
-=======
->>>>>>> develop
     assert(c.top == 0);
     free(c.stack);
     return ret;
@@ -322,23 +216,11 @@ void mini_free(mini_value* v) {
     v->type = MINI_NULL;
 }
 
-<<<<<<< HEAD
->>>>>>> develop
-=======
->>>>>>> develop
 mini_type mini_get_type(const mini_value* v) {
     assert(v != NULL);
     return v->type;
 }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-double mini_get_number(const mini_value* v) {
-    assert(v != NULL && v->type == MINI_NUMBER);
-    return v->n;
-=======
-=======
->>>>>>> develop
 int mini_get_boolean(const mini_value* v) {
     assert(v != NULL && (v->type == MINI_TRUE || v->type == MINI_FALSE));
     return v->type == MINI_TRUE;
@@ -378,8 +260,4 @@ void mini_set_string(mini_value* v, const char* s, size_t len) {
     v->u.s.s[len] = '\0';
     v->u.s.len = len;
     v->type = MINI_STRING;
-<<<<<<< HEAD
->>>>>>> develop
-=======
->>>>>>> develop
 }

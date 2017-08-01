@@ -20,17 +20,6 @@ static int test_pass = 0;
 
 #define EXPECT_EQ_INT(expect, actual) EXPECT_EQ_BASE((expect) == (actual), expect, actual, "%d")
 #define EXPECT_EQ_DOUBLE(expect, actual) EXPECT_EQ_BASE((expect) == (actual), expect, actual, "%.17g")
-<<<<<<< HEAD
-<<<<<<< HEAD
-
-static void test_parse_null() {
-    mini_value v;
-    v.type = MINI_FALSE;
-    EXPECT_EQ_INT(MINI_PARSE_OK, mini_parse(&v, "null"));
-    EXPECT_EQ_INT(MINI_NULL, mini_get_type(&v));
-=======
-=======
->>>>>>> develop
 #define EXPECT_EQ_STRING(expect, actual, alength) \
     EXPECT_EQ_BASE(sizeof(expect) - 1 == alength && memcmp(expect, actual, alength) == 0, expect, actual, "%s")
 #define EXPECT_TRUE(actual) EXPECT_EQ_BASE((actual) != 0, "true", "false", "%s")
@@ -43,74 +32,34 @@ static void test_parse_null() {
     EXPECT_EQ_INT(MINI_PARSE_OK, mini_parse(&v, "null"));
     EXPECT_EQ_INT(MINI_NULL, mini_get_type(&v));
     mini_free(&v);
-<<<<<<< HEAD
->>>>>>> develop
-=======
->>>>>>> develop
 }
 
 static void test_parse_true() {
     mini_value v;
-<<<<<<< HEAD
-<<<<<<< HEAD
-    v.type = MINI_FALSE;
-    EXPECT_EQ_INT(MINI_PARSE_OK, mini_parse(&v, "true"));
-    EXPECT_EQ_INT(MINI_TRUE, mini_get_type(&v));
-=======
-=======
->>>>>>> develop
     mini_init(&v);
     mini_set_boolean(&v, 0);
     EXPECT_EQ_INT(MINI_PARSE_OK, mini_parse(&v, "true"));
     EXPECT_EQ_INT(MINI_TRUE, mini_get_type(&v));
     mini_free(&v);
-<<<<<<< HEAD
->>>>>>> develop
-=======
->>>>>>> develop
 }
 
 static void test_parse_false() {
     mini_value v;
-<<<<<<< HEAD
-<<<<<<< HEAD
-    v.type = MINI_TRUE;
-    EXPECT_EQ_INT(MINI_PARSE_OK, mini_parse(&v, "false"));
-    EXPECT_EQ_INT(MINI_FALSE, mini_get_type(&v));
-=======
-=======
->>>>>>> develop
     mini_init(&v);
     mini_set_boolean(&v, 1);
     EXPECT_EQ_INT(MINI_PARSE_OK, mini_parse(&v, "false"));
     EXPECT_EQ_INT(MINI_FALSE, mini_get_type(&v));
     mini_free(&v);
-<<<<<<< HEAD
->>>>>>> develop
-=======
->>>>>>> develop
 }
 
 #define TEST_NUMBER(expect, json)\
     do {\
         mini_value v;\
-<<<<<<< HEAD
-<<<<<<< HEAD
-        EXPECT_EQ_INT(MINI_PARSE_OK, mini_parse(&v, json));\
-        EXPECT_EQ_INT(MINI_NUMBER, mini_get_type(&v));\
-        EXPECT_EQ_DOUBLE(expect, mini_get_number(&v));\
-=======
-=======
->>>>>>> develop
         mini_init(&v);\
         EXPECT_EQ_INT(MINI_PARSE_OK, mini_parse(&v, json));\
         EXPECT_EQ_INT(MINI_NUMBER, mini_get_type(&v));\
         EXPECT_EQ_DOUBLE(expect, mini_get_number(&v));\
         mini_free(&v);\
-<<<<<<< HEAD
->>>>>>> develop
-=======
->>>>>>> develop
     } while(0)
 
 static void test_parse_number() {
@@ -145,17 +94,6 @@ static void test_parse_number() {
     TEST_NUMBER(-1.7976931348623157e+308, "-1.7976931348623157e+308");
 }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-#define TEST_ERROR(error, json)\
-    do {\
-        mini_value v;\
-        v.type = MINI_FALSE;\
-        EXPECT_EQ_INT(error, mini_parse(&v, json));\
-        EXPECT_EQ_INT(MINI_NULL, mini_get_type(&v));\
-=======
-=======
->>>>>>> develop
 #define TEST_STRING(expect, json)\
     do {\
         mini_value v;\
@@ -171,15 +109,12 @@ static void test_parse_string() {
     TEST_STRING("Hello", "\"Hello\"");
     TEST_STRING("Hello\nWorld", "\"Hello\\nWorld\"");
     TEST_STRING("\" \\ / \b \f \n \r \t", "\"\\\" \\\\ \\/ \\b \\f \\n \\r \\t\"");
-<<<<<<< HEAD
-=======
     TEST_STRING("Hello\0World", "\"Hello\\u0000World\"");
     TEST_STRING("\x24", "\"\\u0024\"");         /* Dollar sign U+0024 */
     TEST_STRING("\xC2\xA2", "\"\\u00A2\"");     /* Cents sign U+00A2 */
     TEST_STRING("\xE2\x82\xAC", "\"\\u20AC\""); /* Euro sign U+20AC */
     TEST_STRING("\xF0\x9D\x84\x9E", "\"\\uD834\\uDD1E\"");  /* G clef sign U+1D11E */
     TEST_STRING("\xF0\x9D\x84\x9E", "\"\\ud834\\udd1e\"");  /* G clef sign U+1D11E */
->>>>>>> develop
 }
 
 #define TEST_ERROR(error, json)\
@@ -190,10 +125,6 @@ static void test_parse_string() {
         EXPECT_EQ_INT(error, mini_parse(&v, json));\
         EXPECT_EQ_INT(MINI_NULL, mini_get_type(&v));\
         mini_free(&v);\
-<<<<<<< HEAD
->>>>>>> develop
-=======
->>>>>>> develop
     } while(0)
 
 static void test_parse_expect_value() {
@@ -230,11 +161,6 @@ static void test_parse_number_too_big() {
     TEST_ERROR(MINI_PARSE_NUMBER_TOO_BIG, "-1e309");
 }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-=======
->>>>>>> develop
 static void test_parse_missing_quotation_mark() {
     TEST_ERROR(MINI_PARSE_MISS_QUOTATION_MARK, "\"");
     TEST_ERROR(MINI_PARSE_MISS_QUOTATION_MARK, "\"abc");
@@ -252,8 +178,6 @@ static void test_parse_invalid_string_char() {
     TEST_ERROR(MINI_PARSE_INVALID_STRING_CHAR, "\"\x1F\"");
 }
 
-<<<<<<< HEAD
-=======
 static void test_parse_invalid_unicode_hex() {
     TEST_ERROR(MINI_PARSE_INVALID_UNICODE_HEX, "\"\\u\"");
     TEST_ERROR(MINI_PARSE_INVALID_UNICODE_HEX, "\"\\u0\"");
@@ -295,7 +219,6 @@ static void test_parse() {
     test_parse_invalid_unicode_surrogate();
 }
 
->>>>>>> develop
 static void test_access_null() {
     mini_value v;
     mini_init(&v);
@@ -335,33 +258,7 @@ static void test_access_string() {
     mini_free(&v);
 }
 
-<<<<<<< HEAD
->>>>>>> develop
-static void test_parse() {
-    test_parse_null();
-    test_parse_true();
-    test_parse_false();
-    test_parse_number();
-<<<<<<< HEAD
-=======
-    test_parse_string();
->>>>>>> develop
-    test_parse_expect_value();
-    test_parse_invalid_value();
-    test_parse_root_not_singular();
-    test_parse_number_too_big();
-<<<<<<< HEAD
-}
-
-int main() {
-=======
-    test_parse_missing_quotation_mark();
-    test_parse_invalid_string_escape();
-    test_parse_invalid_string_char();
-
-=======
 static void test_access() {
->>>>>>> develop
     test_access_null();
     test_access_boolean();
     test_access_number();
@@ -369,16 +266,8 @@ static void test_access() {
 }
 
 int main() {
-<<<<<<< HEAD
-#ifdef _WINDOWS
-    _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
-#endif
->>>>>>> develop
-    test_parse();
-=======
     test_parse();
     test_access();
->>>>>>> develop
     printf("%d/%d (%3.2f%%) passed\n", test_pass, test_count, test_pass * 100.0 / test_count);
     return main_ret;
 }
