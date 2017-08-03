@@ -24,6 +24,8 @@ static int test_pass = 0;
     EXPECT_EQ_BASE(sizeof(expect) - 1 == alength && memcmp(expect, actual, alength) == 0, expect, actual, "%s")
 #define EXPECT_TRUE(actual) EXPECT_EQ_BASE((actual) != 0, "true", "false", "%s")
 #define EXPECT_FALSE(actual) EXPECT_EQ_BASE((actual) == 0, "false", "true", "%s")
+#define EXPECT_EQ_SIZE_T(expect, actual) EXPECT_EQ_BASE((expect) == (actual), (size_t)expect, (size_t)actual, "%zu")
+
 
 static void test_parse_null() {
     mini_value v;
@@ -200,6 +202,45 @@ static void test_parse_invalid_unicode_surrogate() {
     TEST_ERROR(MINI_PARSE_INVALID_UNICODE_SURROGATE, "\"\\uD800\\\\\"");
     TEST_ERROR(MINI_PARSE_INVALID_UNICODE_SURROGATE, "\"\\uD800\\uDBFF\"");
     TEST_ERROR(MINI_PARSE_INVALID_UNICODE_SURROGATE, "\"\\uD800\\uE000\"");
+}
+
+static void test_parse_array() {
+    size_t i,j;
+    mini_value v;
+    mini_init(&v);
+    EXPECT_EQ_INT(MINI_PARSE_OK, mini_parse(&v, "[ ]"));
+    EXPECT_EQ_INT(MINI_ARRAY, mini_get_type(&v));
+    EXPECT_EQ_SIZE_T(0, mini_get_array_size(&v));
+    mini_free(&v);
+
+    mini_init(&v);
+    EXPECT_EQ_INT(MINI_PARSE_OK, mini_parse(&v, "[ null , false , true , 123 , \"abc\" ]"));
+    EXPECT_EQ_INT(MINI_ARRAY, mini_get_type(&v));
+    EXPECT_EQ_SIZE_T(5, mini_get_array_size(&v));
+    EXPECT_EQ_INT(MINI_NULL,   mini_get_type(mini_get_array_element(&v, 0)));
+    EXPECT_EQ_INT(MINI_FALSE,  mini_get_type(mini_get_array_element(&v, 1)));
+    EXPECT_EQ_INT(MINI_TRUE,   mini_get_type(mini_get_array_element(&v, 2)));
+    EXPECT_EQ_INT(MINI_NUMBER, mini_get_type(mini_get_array_element(&v, 3)));
+    EXPECT_EQ_INT(MINI_STRING, mini_get_type(mini_get_array_element(&v, 4)));
+    EXPECT_EQ_DOUBLE(123.0, mini_get_number(mini_get_array_element(&v, 3)));
+    EXPECT_EQ_STRING("abc", mini_get_string(mini_get_array_element(&v, 4)), mini_get_string_length(mini_get_array_element(&v, 4)));
+    mini_free(&v);
+
+    mini_init(&v);
+    EXPECT_EQ_INT(MINI_PARSE_OK, mini_parse(&v, "[ [ ] , [ 0 ] , [ 0 , 1 ] , [ 0 , 1 , 2 ] ]"));
+    EXPECT_EQ_INT(MINI_ARRAY, mini_get_type(&v));
+    EXPECT_EQ_SIZE_T(4, mini_get_array_size(&v));
+    for(i = 0; i < 4; i++) {
+        mini_value* a = mini_get_array_element(&v, i);
+        EXPECT_EQ_INT(MINI_ARRAY, mini_get_type(a));
+        EXPECT_EQ_SIZE_T(i, mini_get_array_size(a));
+        for(j = 0; j < i; j++){
+            mini_value* e = mini_get_array_element(a, j);
+            EXPECT_EQ_INT(MINI_NUMBER, mini_get_type(e));
+            EXPECT_EQ_DOUBLE((double)j, mini_get_number(e));
+        }
+    }
+    mini_free(&v);
 }
 
 static void test_parse() {

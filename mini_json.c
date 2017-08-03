@@ -177,6 +177,51 @@ static int mini_parse_string(mini_context* c, mini_value* v) {
     }
 }
 
+static int mini_parse_value(mini_context* c, mini_value* v);/* forward declare */
+
+static int mini_parse_array(mini_context* c, mini_value* v) {
+    size_t size = 0;
+    size_t i;
+    int ret;
+    EXPECT(c, '[');
+    mini_parse_whitespace(c);
+    if(*c->json == ']') {
+        c->json++;
+        v->type = MINI_ARRAY;
+        v->u.a.size = 0;
+        v->u.a.e = NULL;
+        return MINI_PARSE_OK;
+    }
+    for(;;) {
+        mini_value e;
+        mini_init(&e);
+        if((ret = mini_parse_value(c, &e)) != MINI_PARSE_OK) break;
+        memcpy(mini_context_push(c, sizeof(mini_value)), &e, sizeof(mini_value));
+        size++;
+        mini_parse_whitespace(c);
+        if(*c->json == ',') {
+            c->json++;
+            mini_parse_whitespace(c);
+        }
+        else if(*c->json == ']') {
+            c->json++;
+            v->type = MINI_ARRAY;
+            v->u.a.size = size;
+            size = size * sizeof(mini_value);
+            memcpy(v->u.a.e = (mini_value*)malloc(size), mini_context_push(c, size), size);
+            return MINI_PARSE_OK;
+        }
+        else {
+            ret = MINI_PARSE_MISS_COMMA_OR_SQUARE_BEACKET;
+            break;
+        }
+    }
+    for(i = 0; i < size; i++) {
+        mini_free((mini_value*)mini_context_pop(c, sizeof(mini_value)));
+    }
+    return ret;
+}
+
 static int mini_parse_value(mini_context* c, mini_value* v) {
     switch (*c->json) {
         case 't':  return mini_parse_literal(c, v, "true", MINI_TRUE);
@@ -210,9 +255,20 @@ int mini_parse(mini_value* v, const char* json) {
 }
 
 void mini_free(mini_value* v) {
+    size_t i;
     assert(v != NULL);
-    if (v->type == MINI_STRING)
-        free(v->u.s.s);
+    switch(v->type) {
+        case MINI_STRING:
+            free(v->u.s.s);
+            break;
+        case MINI_ARRAY:
+            for(i = 0; i < v->u.a.size; i++)
+                mini_free(&v->u.a.e[i]);
+            free(v->u.a.e);
+            break;
+        default:
+            break;
+    }
     v->type = MINI_NULL;
 }
 
@@ -260,4 +316,15 @@ void mini_set_string(mini_value* v, const char* s, size_t len) {
     v->u.s.s[len] = '\0';
     v->u.s.len = len;
     v->type = MINI_STRING;
+}
+
+size_t mini_get_array_size(const mini_value* v) {
+    assert(v != NULL && v->type == MINI_ARRAY);
+    return v->u.a.size;
+}
+
+mini_value* mini_get_array_element(const mini_value* v, size_t index) {
+    assert(v != NULL && v->type == MINI_ARRAY);
+    assert(index < v->u.a.size);
+    return &v->u.a.e[index];
 }
