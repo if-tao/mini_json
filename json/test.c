@@ -243,6 +243,58 @@ static void test_parse_array() {
     mini_free(&v);
 }
 
+static void test_parse_object() {
+    mini_value v;
+    size_t i;
+
+    mini_init(&v);
+    EXPECT_EQ_INT(MINI_PARSE_OK, mini_parse(&v, " { } "));
+    EXPECT_EQ_INT(MINI_OBJECT, mini_get_type(&v));
+    EXPECT_EQ_SIZE_T(0, mini_get_object_size(&v));
+    mini_free(&v);
+
+    mini_init(&v);
+    EXPECT_EQ_INT(MINI_PARSE_OK, mini_parse(&v,
+                " { "
+                "\"n\" : null , "
+                "\"f\" : false , "
+                "\"t\" : true , "
+                "\"i\" : 123 , "
+                "\"s\" : \"abc\" , "
+                "\"a\" : [ 1, 2, 3 ], "
+                "\"o\" : { \"1\" : 1, \"2\" : 2, \"3\" : 3 }"
+                " } "
+                ));
+    EXPECT_EQ_INT(MINI_OBJECT, mini_get_type(&v));
+    EXPECT_EQ_SIZE_T(7, mini_get_object_size(&v));
+    EXPECT_EQ_INT(MINI_NULL, mini_get_type(mini_get_object_value(&v, "n")));
+    EXPECT_EQ_INT(MINI_TRUE, mini_get_type(mini_get_object_value(&v, "t")));
+    EXPECT_EQ_INT(MINI_FALSE, mini_get_type(mini_get_object_value(&v, "f")));
+    EXPECT_EQ_INT(MINI_NUMBER, mini_get_type(mini_get_object_value(&v, "i")));
+    EXPECT_EQ_DOUBLE(123.0, mini_get_number(mini_get_object_value(&v, "i")));
+    EXPECT_EQ_INT(MINI_STRING, mini_get_type(mini_get_object_value(&v, "s")));
+    EXPECT_EQ_STRING("abc", mini_get_string(mini_get_object_value(&v, "s")), mini_get_string_length(mini_get_object_value(&v, "s")));
+    EXPECT_EQ_INT(MINI_ARRAY, mini_get_type(mini_get_object_value(&v, "a")));
+    EXPECT_EQ_SIZE_T(3, mini_get_array_size(mini_get_object_value(&v, "a")));
+    for (i = 0; i < 3; i++) {
+        mini_value* e = mini_get_array_element(mini_get_object_value(&v, "a"), i);
+        EXPECT_EQ_INT(MINI_NUMBER, mini_get_type(e));
+        EXPECT_EQ_DOUBLE(i + 1.0, mini_get_number(e));
+    }
+
+    mini_value* o = mini_get_object_value(&v, "o");
+    EXPECT_EQ_INT(MINI_OBJECT, mini_get_type(o));
+    EXPECT_EQ_SIZE_T(3, mini_get_object_size(o));
+    /*
+    for(i = 0; i < 3; i++) {
+        mini_value* ov = mini_get_object_value(o, "1");
+        EXPECT_EQ_INT(MINI_NUMBER, mini_get_type(ov));
+        EXPECT_EQ_DOUBLE(i + 1.0, mini_get_number(ov));
+    }
+    */
+    mini_free(&v);
+}
+
 static void test_parse() {
     test_parse_null();
     test_parse_true();
@@ -258,6 +310,8 @@ static void test_parse() {
     test_parse_invalid_string_char();
     test_parse_invalid_unicode_hex();
     test_parse_invalid_unicode_surrogate();
+    test_parse_array();
+    test_parse_object();
 }
 
 static void test_access_null() {

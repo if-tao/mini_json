@@ -89,40 +89,40 @@ static int mini_parse_number(mini_context* c, mini_value* v) {
 static const char* mini_parse_hex4(const char* p, unsigned int* u) {
     int i;
     *u = 0;
-    for (i = 0; i < 4; i++) {
+    for(i = 0; i<4; ++i){
         char ch = *p++;
         *u <<= 4;
-        if      (ch >= '0' && ch <= '9')  *u |= ch - '0';
-        else if (ch >= 'A' && ch <= 'F')  *u |= ch - ('A' - 10);
-        else if (ch >= 'a' && ch <= 'f')  *u |= ch - ('a' - 10);
-        else return NULL;
+        if      (ch >= '0' && ch <= '9') *u |= ch - '0';
+        else if (ch >= 'a' && ch <= 'f') *u |= ch - ('a' - 10);
+        else if (ch >= 'A' && ch <= 'F') *u |= ch - ('A' - 10);
+        else    return NULL;
     }
     return p;
 }
 
-static void mini_encode_utf8(mini_context* c, unsigned int u) {
-    if (u <= 0x7F) 
+static void mini_encode_utf8(mini_context* c, unsigned int u){
+    if(u <= 0x7F)
         PUTC(c, u & 0xFF);
-    else if (u <= 0x7FF) {
+    else if(u <= 0x7FF) {
         PUTC(c, 0xC0 | ((u >> 6) & 0xFF));
         PUTC(c, 0x80 | ( u       & 0x3F));
     }
-    else if (u <= 0xFFFF) {
+    else if(u <= 0xFFFF) {
         PUTC(c, 0xE0 | ((u >> 12) & 0xFF));
-        PUTC(c, 0x80 | ((u >>  6) & 0x3F));
+        PUTC(c, 0x80 | ((u >> 6)  & 0x3F));
         PUTC(c, 0x80 | ( u        & 0x3F));
     }
     else {
         assert(u <= 0x10FFFF);
-        PUTC(c, 0xF0 | ((u >> 18) & 0xFF));
-        PUTC(c, 0x80 | ((u >> 12) & 0x3F));
-        PUTC(c, 0x80 | ((u >>  6) & 0x3F));
-        PUTC(c, 0x80 | ( u        & 0x3F));
+         PUTC(c, 0xF0 | ((u >> 18) & 0xFF));
+         PUTC(c, 0x80 | ((u >> 12) & 0x3F));
+         PUTC(c, 0x80 | ((u >>  6) & 0x3F));
+         PUTC(c, 0x80 | ( u        & 0x3F));
     }
 }
 
-#define STRING_ERROR(ret) do { c->top = head; return ret; } while(0)
 
+#define STRING_ERROR(ret) do { c->top = head; return ret; } while(0)
 static int mini_parse_string(mini_context* c, mini_value* v) {
     size_t head = c->top, len;
     unsigned int u, u2;
@@ -148,16 +148,16 @@ static int mini_parse_string(mini_context* c, mini_value* v) {
                     case 'r':  PUTC(c, '\r'); break;
                     case 't':  PUTC(c, '\t'); break;
                     case 'u':
-                        if (!(p = mini_parse_hex4(p, &u)))
-                            STRING_ERROR(MINI_PARSE_INVALID_UNICODE_HEX);
-                        if (u >= 0xD800 && u <= 0xDBFF) { /* surrogate pair */
-                            if (*p++ != '\\')
+                        if(!(p = mini_parse_hex4(p, &u)))
+                           STRING_ERROR(MINI_PARSE_INVALID_UNICODE_HEX);
+                        if(u >= 0xD800 && u <= 0xDBFF) {
+                            if(*p++ != '\\')
                                 STRING_ERROR(MINI_PARSE_INVALID_UNICODE_SURROGATE);
-                            if (*p++ != 'u')
+                            if(*p++ != 'u')
                                 STRING_ERROR(MINI_PARSE_INVALID_UNICODE_SURROGATE);
-                            if (!(p = mini_parse_hex4(p, &u2)))
+                            if(!(p = mini_parse_hex4(p, &u2)))
                                 STRING_ERROR(MINI_PARSE_INVALID_UNICODE_HEX);
-                            if (u2 < 0xDC00 || u2 > 0xDFFF)
+                            if(u2 < 0xDC00 || u2 > 0xDFFF)
                                 STRING_ERROR(MINI_PARSE_INVALID_UNICODE_SURROGATE);
                             u = (((u - 0xD800) << 10) | (u2 - 0xDC00)) + 0x10000;
                         }
@@ -170,8 +170,9 @@ static int mini_parse_string(mini_context* c, mini_value* v) {
             case '\0':
                 STRING_ERROR(MINI_PARSE_MISS_QUOTATION_MARK);
             default:
-                if ((unsigned char)ch < 0x20)
+                if ((unsigned char)ch < 0x20) { 
                     STRING_ERROR(MINI_PARSE_INVALID_STRING_CHAR);
+                }
                 PUTC(c, ch);
         }
     }
@@ -208,7 +209,7 @@ static int mini_parse_array(mini_context* c, mini_value* v) {
             v->type = MINI_ARRAY;
             v->u.a.size = size;
             size = size * sizeof(mini_value);
-            memcpy(v->u.a.e = (mini_value*)malloc(size), mini_context_push(c, size), size);
+            memcpy(v->u.a.e = (mini_value*)malloc(size), mini_context_pop(c, size), size);
             return MINI_PARSE_OK;
         }
         else {
@@ -222,6 +223,71 @@ static int mini_parse_array(mini_context* c, mini_value* v) {
     return ret;
 }
 
+static int mini_parse_object(mini_context* c, mini_value* v) {
+    size_t i,size;
+    int ret;
+
+    EXPECT(c, '{');
+    mini_parse_whitespace(c);
+    if(*c->json == '}') {
+        c->json++;
+        v->type = MINI_OBJECT;
+        v->u.o.pmap = NULL;
+        v->u.o.size = 0;
+        return MINI_PARSE_OK;
+    }
+    v->u.o.pmap = (Map *)malloc(sizeof(Map));
+    *(v->u.o.pmap) = map();
+    size = 0;
+    for(;;){
+        mini_value key;
+        mini_value value;
+        mini_init(&key);
+        mini_init(&value);
+        /* parse key */
+        if(*c->json != '\"'){
+            ret = MINI_PARSE_MISS_KEY;
+            break;
+        }
+        if((ret = mini_parse_string(c, &key)) != MINI_PARSE_OK) 
+            break;
+        /* parse ws colon ws */
+        mini_parse_whitespace(c);
+        if(*c->json != ':'){
+            ret = MINI_PARSE_MISS_COLON;
+            break;
+        }
+        c->json++;
+        mini_parse_whitespace(c);
+        /* parse value */
+        if((ret = mini_parse_value(c, &value)) != MINI_PARSE_OK)
+            break;
+        Item *pitem = new_item(key.u.s.s, &value);
+        add_item(v->u.o.pmap, pitem);
+        size++;
+        mini_free(&key); //for next key
+        /* parse ws [comma / right-curly-brae] ws */
+        mini_parse_whitespace(c);
+        if(*c->json == ','){
+            c->json++;
+            mini_parse_whitespace(c);
+        }
+        else if(*c->json == '}') {
+            c->json++;
+            v->type = MINI_OBJECT;
+            v->u.o.size = size;
+            return MINI_PARSE_OK;
+        }
+        else{
+            ret = MINI_PARSE_MISS_COMMA_OR_CURLY_BRACKET;
+            break;
+        }
+    }
+    mini_free(v);
+    v->type = MINI_NULL;
+    return ret;
+}
+
 static int mini_parse_value(mini_context* c, mini_value* v) {
     switch (*c->json) {
         case 't':  return mini_parse_literal(c, v, "true", MINI_TRUE);
@@ -229,6 +295,8 @@ static int mini_parse_value(mini_context* c, mini_value* v) {
         case 'n':  return mini_parse_literal(c, v, "null", MINI_NULL);
         default:   return mini_parse_number(c, v);
         case '"':  return mini_parse_string(c, v);
+        case '[':  return mini_parse_array(c, v);
+        case '{':  return mini_parse_object(c, v);
         case '\0': return MINI_PARSE_EXPECT_VALUE;
     }
 }
@@ -265,6 +333,11 @@ void mini_free(mini_value* v) {
             for(i = 0; i < v->u.a.size; i++)
                 mini_free(&v->u.a.e[i]);
             free(v->u.a.e);
+            break;
+        case MINI_OBJECT:
+            if(v->u.o.pmap == NULL) break;
+            map_clear(v->u.o.pmap, inner_clear);
+            free(v->u.o.pmap);
             break;
         default:
             break;
@@ -328,3 +401,39 @@ mini_value* mini_get_array_element(const mini_value* v, size_t index) {
     assert(index < v->u.a.size);
     return &v->u.a.e[index];
 }
+
+size_t mini_get_object_size(const mini_value* v) {
+    assert(v != NULL && v->type == MINI_OBJECT);
+    return v->u.o.size;
+}
+
+mini_value* mini_get_object_value(const mini_value* v, const char* key) {
+    assert(v != NULL && v->type == MINI_OBJECT);
+    return (mini_value*)value(v->u.o.pmap, key);
+}
+
+Item* new_item(const char* key, void *value) {
+    Item *p = (Item*)lalloc(sizeof(Item), 1);
+    p->key = (char*)lalloc(sizeof(char), strlen(key)+1);
+    strcpy(p->key, key);
+    p->value = lalloc(sizeof(mini_value), 1);
+    memcpy(p->value, (mini_value*)value, sizeof(mini_value));
+    return p;
+}
+
+void inner_clear(void* p) {
+    Item* pitem = (Item *)p;
+    mini_free(pitem->value);
+    lfree(pitem->key);
+    lfree(pitem->value);
+    lfree(pitem);
+}
+
+void show_item(void *data) {
+    Item* pitem = (Item *)data;
+    mini_value *value = (mini_value*)pitem->value;
+    printf("%s : ",pitem->key);
+    //show_value(value);
+    printf("\n");
+}
+
