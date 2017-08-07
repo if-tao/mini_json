@@ -18,6 +18,12 @@ struct mini_value {
     mini_type type;
 };
 
+typedef struct {
+    const char* json;
+    char* stack;
+    size_t size, top;
+}mini_context;
+
 enum {
     MINI_PARSE_OK = 0,
     MINI_PARSE_EXPECT_VALUE,
@@ -29,10 +35,11 @@ enum {
     MINI_PARSE_INVALID_STRING_CHAR,
     MINI_PARSE_INVALID_UNICODE_HEX,
     MINI_PARSE_INVALID_UNICODE_SURROGATE,
-    MINI_PARSE_MISS_COMMA_OR_SQUARE_BEACKET,
+    MINI_PARSE_MISS_COMMA_OR_SQUARE_BRACKET,
     MINI_PARSE_MISS_KEY,
     MINI_PARSE_MISS_COLON,
-    MINI_PARSE_MISS_COMMA_OR_CURLY_BRACKET
+    MINI_PARSE_MISS_COMMA_OR_CURLY_BRACKET,
+    MINI_BUILDER_OK
 };
 
 #define mini_init(v) do { (v)->type = MINI_NULL; } while(0)
@@ -60,13 +67,20 @@ mini_value* mini_get_array_element(const mini_value* v, size_t index);
 
 size_t mini_get_object_size(const mini_value* v);
 mini_value* mini_get_object_value(const mini_value* v, const char* key);
+
+/*****************************************
+ *
+ *             builder
+ *
+ *****************************************/
+int mini_creater(const mini_value* v, char** json, size_t* length);
 /******************************************
  *
  *              map
  *
- * ****************************************/
+ ******************************************/
 Item* new_item(const char* key, void *value);
 void inner_clear(void *p);
 void show_item(void *data);
-
+void mini_traverse_map_for_object(mini_context* c, const mini_value* v);
 #endif //_MINI_JSON_H__

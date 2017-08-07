@@ -28,8 +28,8 @@ int value_compare(void *p, void *key) {
 void *value(Map *pmap, const char *key) {
 	Node *p = find(pmap->tree, value_compare, (void *)key);
 	if (p == NULL) {
-		// not exsit
-		printf("Not Exsit\n");
+		// not exist
+		printf("Not Exist\n");
 		return "";
 	}
 	return ((Item *)(p->data))->value;

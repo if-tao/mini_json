@@ -295,6 +295,36 @@ static void test_parse_object() {
     mini_free(&v);
 }
 
+static void test_parse_miss_comma_or_square_bracket() {
+    TEST_ERROR(MINI_PARSE_MISS_COMMA_OR_SQUARE_BRACKET, "[1");
+    TEST_ERROR(MINI_PARSE_MISS_COMMA_OR_SQUARE_BRACKET, "[1}");
+    TEST_ERROR(MINI_PARSE_MISS_COMMA_OR_SQUARE_BRACKET, "[1 2");
+    TEST_ERROR(MINI_PARSE_MISS_COMMA_OR_SQUARE_BRACKET, "[[]");
+}
+
+static void test_parse_miss_key() {
+    TEST_ERROR(MINI_PARSE_MISS_KEY, "{:1,");
+    TEST_ERROR(MINI_PARSE_MISS_KEY, "{1:1,");
+    TEST_ERROR(MINI_PARSE_MISS_KEY, "{true:1,");
+    TEST_ERROR(MINI_PARSE_MISS_KEY, "{false:1,");
+    TEST_ERROR(MINI_PARSE_MISS_KEY, "{null:1,");
+    TEST_ERROR(MINI_PARSE_MISS_KEY, "{[]:1,");
+    TEST_ERROR(MINI_PARSE_MISS_KEY, "{{}:1,");
+    TEST_ERROR(MINI_PARSE_MISS_KEY, "{\"a\":1,");
+}
+
+static void test_parse_miss_colon() {
+    TEST_ERROR(MINI_PARSE_MISS_COLON, "{\"a\"}");
+    TEST_ERROR(MINI_PARSE_MISS_COLON, "{\"a\",\"b\"}");
+}
+
+static void test_parse_miss_comma_or_curly_bracket() {
+    TEST_ERROR(MINI_PARSE_MISS_COMMA_OR_CURLY_BRACKET, "{\"a\":1");
+    TEST_ERROR(MINI_PARSE_MISS_COMMA_OR_CURLY_BRACKET, "{\"a\":1]");
+    TEST_ERROR(MINI_PARSE_MISS_COMMA_OR_CURLY_BRACKET, "{\"a\":1 \"b\"");
+    TEST_ERROR(MINI_PARSE_MISS_COMMA_OR_CURLY_BRACKET, "{\"a\":{}");
+}
+
 static void test_parse() {
     test_parse_null();
     test_parse_true();
@@ -312,6 +342,73 @@ static void test_parse() {
     test_parse_invalid_unicode_surrogate();
     test_parse_array();
     test_parse_object();
+    test_parse_miss_comma_or_square_bracket();
+    //test_parse_miss_key();
+    //test_parse_miss_colon();
+    //test_parse_miss_comma_or_curly_bracket();
+}
+
+#define TEST_ROUNDTRIP(json)\
+        do {\
+                    mini_value v;\
+                    char* json2;\
+                    size_t length;\
+                    mini_init(&v);\
+                    EXPECT_EQ_INT(MINI_PARSE_OK, mini_parse(&v, json));\
+                    mini_creater(&v, &json2, &length);\
+                    EXPECT_EQ_STRING(json, json2, length);\
+                    mini_free(&v);\
+                    free(json2);\
+                } while(0)
+
+static void test_creater_number() {
+    TEST_ROUNDTRIP("0");
+    TEST_ROUNDTRIP("-0");
+    TEST_ROUNDTRIP("1");
+    TEST_ROUNDTRIP("-1");
+    TEST_ROUNDTRIP("1.5");
+    TEST_ROUNDTRIP("-1.5");
+    TEST_ROUNDTRIP("3.25");
+    TEST_ROUNDTRIP("1e+20");
+    TEST_ROUNDTRIP("1.234e+20");
+    TEST_ROUNDTRIP("1.234e-20");
+    TEST_ROUNDTRIP("1.0000000000000002"); /* the smallest number > 1 */
+    TEST_ROUNDTRIP("4.9406564584124654e-324"); /* minimum denormal */
+    TEST_ROUNDTRIP("-4.9406564584124654e-324");
+    TEST_ROUNDTRIP("2.2250738585072009e-308");  /* Max subnormal double */
+    TEST_ROUNDTRIP("-2.2250738585072009e-308");
+    TEST_ROUNDTRIP("2.2250738585072014e-308");  /* Min normal positive double */
+    TEST_ROUNDTRIP("-2.2250738585072014e-308");
+    TEST_ROUNDTRIP("1.7976931348623157e+308");  /* Max double */
+    TEST_ROUNDTRIP("-1.7976931348623157e+308");
+}
+
+static void test_creater_string() {
+    TEST_ROUNDTRIP("\"\"");
+    TEST_ROUNDTRIP("\"Hello\"");
+    TEST_ROUNDTRIP("\"Hello\\nWorld\"");
+    TEST_ROUNDTRIP("\"\\\" \\\\ / \\b \\f \\n \\r \\t\"");
+    TEST_ROUNDTRIP("\"Hello\\u0000World\"");
+}
+
+static void test_creater_array() {
+    TEST_ROUNDTRIP("[]");
+    TEST_ROUNDTRIP("[null,false,true,123,\"abc\",[1,2,3]]");
+}
+
+static void test_creater_object() {
+    TEST_ROUNDTRIP("{}");
+    TEST_ROUNDTRIP("{\"n\":null,\"f\":false,\"t\":true,\"i\":123,\"s\":\"abc\",\"a\":[1,2,3],\"o\":{\"1\":1,\"2\":2,\"3\":3}}");
+}
+
+static void test_creater() {
+    TEST_ROUNDTRIP("null");
+    TEST_ROUNDTRIP("false");
+    TEST_ROUNDTRIP("true");
+    //test_creater_number();
+    test_creater_string();
+    //test_creater_array();
+    //test_creater_object();
 }
 
 static void test_access_null() {
@@ -362,6 +459,7 @@ static void test_access() {
 
 int main() {
     test_parse();
+    test_creater();
     test_access();
     printf("%d/%d (%3.2f%%) passed\n", test_pass, test_count, test_pass * 100.0 / test_count);
     return main_ret;

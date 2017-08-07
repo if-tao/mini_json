@@ -9,16 +9,16 @@
 #define MINI_PARSE_STACK_INIT_SIZE 256
 #endif
 
+#ifndef MINI_PARSE_BUILDER_INIT_SIZE
+#define MINI_PARSE_BUILDER_INIT_SIZE 256
+#endif
+
 #define EXPECT(c, ch)       do { assert(*c->json == (ch)); c->json++; } while(0)
 #define ISDIGIT(ch)         ((ch) >= '0' && (ch) <= '9')
 #define ISDIGIT1TO9(ch)     ((ch) >= '1' && (ch) <= '9')
 #define PUTC(c, ch)         do { *(char*)mini_context_push(c, sizeof(char)) = (ch); } while(0)
+#define PUTS(c, s, len)     memcpy(mini_context_push(c,len), s, len)
 
-typedef struct {
-    const char* json;
-    char* stack;
-    size_t size, top;
-}mini_context;
 
 static void* mini_context_push(mini_context* c, size_t size) {
     void* ret;
@@ -213,7 +213,7 @@ static int mini_parse_array(mini_context* c, mini_value* v) {
             return MINI_PARSE_OK;
         }
         else {
-            ret = MINI_PARSE_MISS_COMMA_OR_SQUARE_BEACKET;
+            ret = MINI_PARSE_MISS_COMMA_OR_SQUARE_BRACKET;
             break;
         }
     }
@@ -265,7 +265,8 @@ static int mini_parse_object(mini_context* c, mini_value* v) {
         Item *pitem = new_item(key.u.s.s, &value);
         add_item(v->u.o.pmap, pitem);
         size++;
-        mini_free(&key); //for next key
+        mini_free(&key); //free the memory
+        //mini_free(&value);
         /* parse ws [comma / right-curly-brae] ws */
         mini_parse_whitespace(c);
         if(*c->json == ','){
@@ -293,11 +294,11 @@ static int mini_parse_value(mini_context* c, mini_value* v) {
         case 't':  return mini_parse_literal(c, v, "true", MINI_TRUE);
         case 'f':  return mini_parse_literal(c, v, "false", MINI_FALSE);
         case 'n':  return mini_parse_literal(c, v, "null", MINI_NULL);
-        default:   return mini_parse_number(c, v);
         case '"':  return mini_parse_string(c, v);
         case '[':  return mini_parse_array(c, v);
         case '{':  return mini_parse_object(c, v);
         case '\0': return MINI_PARSE_EXPECT_VALUE;
+        default:   return mini_parse_number(c, v);
     }
 }
 
@@ -412,6 +413,79 @@ mini_value* mini_get_object_value(const mini_value* v, const char* key) {
     return (mini_value*)value(v->u.o.pmap, key);
 }
 
+static void mini_creater_string(mini_context* c, const char* s, size_t len) {
+    static const char hex_digits[] = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
+    size_t i, size;
+    char* head, *p;
+    assert(s != NULL);
+    p = head = mini_context_push(c, size = len * 6 + 2); /* "\u00xx ... " */
+    *p++ = '"';
+    for(i = 0; i < len; i++){
+        unsigned char ch = (unsigned char)s[i];
+        switch(ch) {
+            case '\"' : *p++ = '\\', *p++ = '\"';break;
+            case '\\' : *p++ = '\\'; *p++ = '\\'; break;
+            case '\b' : *p++ = '\\'; *p++ = 'b';  break;
+            case '\f' : *p++ = '\\'; *p++ = 'f';  break;
+            case '\n' : *p++ = '\\'; *p++ = 'n';  break;
+            case '\r' : *p++ = '\\'; *p++ = 'r';  break;
+            case '\t' : *p++ = '\\'; *p++ = 't';  break;
+            default :
+                if( ch < 0x20) {
+                    *p++ = '\\'; *p++ = 'u'; *p++ = '0'; *p++ = '0';
+                    *p++ = hex_digits[ch >> 4];
+                    *p++ = hex_digits[ch & 15];
+                }
+                else
+                    *p++ = s[i];
+        }
+    }
+    *p++ = '"';
+    c->top -= size - (p - head);
+}
+
+static void mini_creater_value(mini_context* c, const mini_value* v) {
+    size_t i;
+    switch(v->type) {
+        case MINI_NULL : PUTS(c, "null", 4);break;
+        case MINI_TRUE : PUTS(c, "true", 4);break;
+        case MINI_FALSE : PUTS(c, "false", 5);break;
+        case MINI_NUMBER ://使用sprintf("%.17g",...)来把浮点数转换成文本
+                c->top -= 32 - sprintf(mini_context_push(c, 32), "%.17g", v->u.n);
+        case MINI_STRING : mini_creater_string(c, v->u.s.s, v->u.s.len); break;
+        case MINI_ARRAY :
+                PUTC(c, '[');
+                for(i = 0; i < v->u.a.size; i++){
+                    if(i > 0)
+                        PUTC(c, ',');
+                    mini_creater_value(c, &v->u.a.e[i]);
+                }
+                PUTC(c, ']');
+                break;
+        case MINI_OBJECT :
+                PUTC(c, '{');
+                /* 由于使用了map， 需要遍历 */
+                mini_traverse_map_for_object(c, v);
+                PUTC(c, '}');
+                break;
+    }
+}
+
+int mini_creater(const mini_value* v, char** json, size_t* length) {
+    mini_context c;
+    size_t ret;
+    assert(v != NULL);
+    assert(json != NULL);
+    c.stack = (char*)malloc(c.size = MINI_PARSE_BUILDER_INIT_SIZE);
+    c.top = 0;
+    mini_creater_value(&c, v);
+    if(length)
+        *length = c.top;
+    PUTC(&c, '\0');
+    *json = c.stack;
+    return MINI_BUILDER_OK;
+}
+
 Item* new_item(const char* key, void *value) {
     Item *p = (Item*)lalloc(sizeof(Item), 1);
     p->key = (char*)lalloc(sizeof(char), strlen(key)+1);
@@ -437,3 +511,39 @@ void show_item(void *data) {
     printf("\n");
 }
 
+void mini_traverse_map_for_object(mini_context* c, const mini_value* v){
+    Map* pmap = v->u.o.pmap;
+    if(pmap->tree->root == NULL) {
+        printf("Empty tree!!");
+        return ;
+    }
+    Node *p = pmap->tree->root;
+    Node *tail = pmap->tree->tail;
+    size_t i = 0;
+    while(p->left != tail)
+        p = p->left;
+
+    while(p != NULL){
+        if(i > 0) PUTC(c, ',');
+        Item *pitem = (Item*)p->data;
+        mini_value *value = (mini_value*)(pitem->value);
+        mini_creater_string(c, pitem->key, strlen(pitem->key));
+        PUTC(c, ':');
+        mini_creater_value(c, value);
+        i++;
+        if(p->right != tail)
+        {
+            p = p->right;
+            while(p->left != tail) p = p->left;
+        }
+        else{
+            Node* tmp = p->parent;
+            while(tmp != NULL && tmp->right == p)
+            {
+                p = tmp;
+                tmp = p->parent;
+            }
+            p = tmp;
+        }
+    }
+}
