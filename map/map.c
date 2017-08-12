@@ -17,7 +17,7 @@ void add_item(Map *pmap, Item *item) {
 	insert(pmap->tree, item, compare);
 }
 
-void mapshow(Map *pmap, FUNC show_item) {
+void map_show(Map *pmap, FUNC show_item) {
 	show(pmap->tree, show_item);
 }
 

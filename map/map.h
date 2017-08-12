@@ -31,7 +31,7 @@ void add_item(Map *pmap, Item *);
 //获取key对应value
 void *value(Map *, const char *);
 //展示map中的数据
-void mapshow(Map *pmap, FUNC show_item);
+void map_show(Map *pmap, FUNC show_item);
 //清除map所占用的内存
 void map_clear(Map *, FUNC);
 

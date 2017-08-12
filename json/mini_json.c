@@ -19,6 +19,78 @@
 #define PUTC(c, ch)         do { *(char*)mini_context_push(c, sizeof(char)) = (ch); } while(0)
 #define PUTS(c, s, len)     memcpy(mini_context_push(c,len), s, len)
 
+void mini_show_value(mini_value* v) {
+    assert(v != NULL);
+    size_t i;
+    switch(v->type){
+        case MINI_NULL : printf("null"); break;
+        case MINI_TRUE : printf("true"); break;
+        case MINI_FALSE : printf("false"); break;
+        case MINI_NUMBER : printf(" %f ", mini_get_number(v)); break;
+        case MINI_STRING : printf(" %s ", mini_get_string(v)); break;
+        case MINI_ARRAY : 
+                printf("[ ");
+                size_t size = mini_get_array_size(v);
+                for(i = 0; i < size; ++i) {
+                    if(i > 0) printf(" , ");
+                    mini_show_value(mini_get_array_element(v, i));
+                }
+                printf(" ]");
+                break;
+        case MINI_OBJECT : 
+                printf("{ ");
+                map_show(get_map(v), show_item);
+                printf(" }");
+                break;
+    }
+}
+
+mini_value* mini_create_number(double n) {
+    mini_value* ret = (mini_value*)malloc(sizeof(mini_value));
+    mini_set_number(ret, n);
+    return ret;
+}
+
+mini_value* mini_create_string(const char* s) {
+    mini_value* ret = (mini_value*)malloc(sizeof(mini_value));
+    mini_set_string(ret, s, strlen(s));
+    return ret;
+}
+
+mini_value* mini_create_array() {
+    mini_value* ret = (mini_value*)malloc(sizeof(mini_value));
+    mini_init_array(ret);
+    return ret;
+}
+
+mini_value* mini_create_object() {
+    mini_value* ret = (mini_value*)malloc(sizeof(mini_value));
+    mini_init_object(ret);
+    return ret;
+}
+
+void mini_add_value_to_array(mini_value* arr, mini_value* v) {
+    assert(arr != NULL && v != NULL && arr->type == MINI_ARRAY);
+    size_t size = mini_get_array_size(arr);
+    if(size == 0){
+        arr->u.a.e = v;
+    }
+    else{
+        arr->u.a.e = (mini_value*)realloc(arr->u.a.e, sizeof(mini_value) * (size+1));
+        memcpy(arr->u.a.e+size, v, sizeof(mini_value));
+    }
+    arr->u.a.size += 1;
+}
+
+void mini_add_value_to_object(mini_value* obj, mini_value* key, mini_value* value) {
+    assert(obj != NULL && obj->type == MINI_OBJECT && key != NULL && value != NULL);
+    if(get_map(obj) == NULL){
+        mini_init_object(obj);
+    }
+    Item* pitem = new_item(mini_get_string(key), value);
+    add_item(get_map(obj), pitem);
+    obj->u.o.size += 1;
+}
 
 static void* mini_context_push(mini_context* c, size_t size) {
     void* ret;
@@ -266,7 +338,6 @@ static int mini_parse_object(mini_context* c, mini_value* v) {
         add_item(v->u.o.pmap, pitem);
         size++;
         mini_free(&key); //free the memory
-        //mini_free(&value);
         /* parse ws [comma / right-curly-brae] ws */
         mini_parse_whitespace(c);
         if(*c->json == ','){
@@ -392,6 +463,12 @@ void mini_set_string(mini_value* v, const char* s, size_t len) {
     v->type = MINI_STRING;
 }
 
+void mini_init_array(mini_value* v) {
+    assert(v != NULL);
+    v->type = MINI_ARRAY;
+    v->u.a.size = 0;
+}
+
 size_t mini_get_array_size(const mini_value* v) {
     assert(v != NULL && v->type == MINI_ARRAY);
     return v->u.a.size;
@@ -401,6 +478,13 @@ mini_value* mini_get_array_element(const mini_value* v, size_t index) {
     assert(v != NULL && v->type == MINI_ARRAY);
     assert(index < v->u.a.size);
     return &v->u.a.e[index];
+}
+
+void mini_init_object(mini_value* v) {
+    assert(v != NULL);
+    v->type = MINI_OBJECT;
+    v->u.o.pmap = (Map*)malloc(sizeof(Map));
+    *(v->u.o.pmap) = map();
 }
 
 size_t mini_get_object_size(const mini_value* v) {
@@ -413,7 +497,7 @@ mini_value* mini_get_object_value(const mini_value* v, const char* key) {
     return (mini_value*)value(v->u.o.pmap, key);
 }
 
-static void mini_creater_string(mini_context* c, const char* s, size_t len) {
+static void mini_generate_string(mini_context* c, const char* s, size_t len) {
     static const char hex_digits[] = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
     size_t i, size;
     char* head, *p;
@@ -444,7 +528,7 @@ static void mini_creater_string(mini_context* c, const char* s, size_t len) {
     c->top -= size - (p - head);
 }
 
-static void mini_creater_value(mini_context* c, const mini_value* v) {
+static void mini_generate_value(mini_context* c, const mini_value* v) {
     size_t i;
     switch(v->type) {
         case MINI_NULL : PUTS(c, "null", 4);break;
@@ -452,13 +536,13 @@ static void mini_creater_value(mini_context* c, const mini_value* v) {
         case MINI_FALSE : PUTS(c, "false", 5);break;
         case MINI_NUMBER ://使用sprintf("%.17g",...)来把浮点数转换成文本
                 c->top -= 32 - sprintf(mini_context_push(c, 32), "%.17g", v->u.n);
-        case MINI_STRING : mini_creater_string(c, v->u.s.s, v->u.s.len); break;
+        case MINI_STRING : mini_generate_string(c, v->u.s.s, v->u.s.len); break;
         case MINI_ARRAY :
                 PUTC(c, '[');
                 for(i = 0; i < v->u.a.size; i++){
                     if(i > 0)
                         PUTC(c, ',');
-                    mini_creater_value(c, &v->u.a.e[i]);
+                    mini_generate_value(c, &v->u.a.e[i]);
                 }
                 PUTC(c, ']');
                 break;
@@ -471,21 +555,25 @@ static void mini_creater_value(mini_context* c, const mini_value* v) {
     }
 }
 
-int mini_creater(const mini_value* v, char** json, size_t* length) {
+int mini_generate(const mini_value* v, char** json, size_t* length) {
     mini_context c;
     size_t ret;
     assert(v != NULL);
     assert(json != NULL);
     c.stack = (char*)malloc(c.size = MINI_PARSE_BUILDER_INIT_SIZE);
     c.top = 0;
-    mini_creater_value(&c, v);
+    mini_generate_value(&c, v);
     if(length)
         *length = c.top;
     PUTC(&c, '\0');
     *json = c.stack;
-    return MINI_BUILDER_OK;
+    return MINI_GENERATE_OK;
 }
 
+Map* get_map(mini_value* v) {
+    assert(v != NULL && v->type == MINI_OBJECT);
+    return v->u.o.pmap;
+}
 Item* new_item(const char* key, void *value) {
     Item *p = (Item*)lalloc(sizeof(Item), 1);
     p->key = (char*)lalloc(sizeof(char), strlen(key)+1);
@@ -507,7 +595,7 @@ void show_item(void *data) {
     Item* pitem = (Item *)data;
     mini_value *value = (mini_value*)pitem->value;
     printf("%s : ",pitem->key);
-    //show_value(value);
+    mini_show_value(value);
     printf("\n");
 }
 
@@ -527,9 +615,9 @@ void mini_traverse_map_for_object(mini_context* c, const mini_value* v){
         if(i > 0) PUTC(c, ',');
         Item *pitem = (Item*)p->data;
         mini_value *value = (mini_value*)(pitem->value);
-        mini_creater_string(c, pitem->key, strlen(pitem->key));
+        mini_generate_string(c, pitem->key, strlen(pitem->key));
         PUTC(c, ':');
-        mini_creater_value(c, value);
+        mini_generate_value(c, value);
         i++;
         if(p->right != tail)
         {

@@ -355,7 +355,7 @@ static void test_parse() {
                     size_t length;\
                     mini_init(&v);\
                     EXPECT_EQ_INT(MINI_PARSE_OK, mini_parse(&v, json));\
-                    mini_creater(&v, &json2, &length);\
+                    mini_generate(&v, &json2, &length);\
                     EXPECT_EQ_STRING(json, json2, length);\
                     mini_free(&v);\
                     free(json2);\
