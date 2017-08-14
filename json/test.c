@@ -343,9 +343,9 @@ static void test_parse() {
     test_parse_array();
     test_parse_object();
     test_parse_miss_comma_or_square_bracket();
-    //test_parse_miss_key();
-    //test_parse_miss_colon();
-    //test_parse_miss_comma_or_curly_bracket();
+    test_parse_miss_key();
+    test_parse_miss_colon();
+    test_parse_miss_comma_or_curly_bracket();
 }
 
 #define TEST_ROUNDTRIP(json)\
@@ -399,16 +399,19 @@ static void test_creater_array() {
 static void test_creater_object() {
     TEST_ROUNDTRIP("{}");
     TEST_ROUNDTRIP("{\"n\":null,\"f\":false,\"t\":true,\"i\":123,\"s\":\"abc\",\"a\":[1,2,3],\"o\":{\"1\":1,\"2\":2,\"3\":3}}");
+    TEST_ROUNDTRIP("{\"a\":[1,2,3],\"f\":false,\"i\":123,\"n\":null,\"o\":{\"1\":1,\"2\":2,\"3\":3},\"s\":\"abc\",\"t\":true}");
 }
 
 static void test_creater() {
+#if 1
     TEST_ROUNDTRIP("null");
     TEST_ROUNDTRIP("false");
     TEST_ROUNDTRIP("true");
-    //test_creater_number();
+    test_creater_number();
     test_creater_string();
-    //test_creater_array();
-    //test_creater_object();
+    test_creater_array();
+#endif
+    test_creater_object();
 }
 
 static void test_access_null() {

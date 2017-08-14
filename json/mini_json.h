@@ -48,11 +48,7 @@ enum {
  *              interface
  *
  *****************************************/
-void mini_show_value(mini_value* v);
-mini_value* mini_create_number(double n);
-mini_value* mini_create_string(const char* s);
-mini_value* mini_create_array();
-mini_value* mini_create_object();
+void mini_show_value(const mini_value* v);
 void mini_add_value_to_array(mini_value* arr, mini_value* v);
 void mini_add_value_to_object(mini_value* obj, mini_value* key, mini_value* value);
 
@@ -61,14 +57,10 @@ int mini_generate(const mini_value* v, char** json, size_t* length);
 void mini_free(mini_value* v);
 
 
-/*****************************************
- *
- *              parse
- *
- *****************************************/
 #define mini_init(v) do { (v)->type = MINI_NULL; } while(0)
 
 mini_type mini_get_type(const mini_value* v);
+void mini_set_type(mini_value* v, mini_type type);
 
 #define mini_set_null(v) mini_free(v)
 
@@ -95,9 +87,9 @@ mini_value* mini_get_object_value(const mini_value* v, const char* key);
  *              map
  * 
  ******************************************/
-Map* get_map(mini_value* v);
+Map* get_map(const mini_value* v);
 Item* new_item(const char* key, void *value);
 void inner_clear(void *p);
 void show_item(void *data);
-void mini_traverse_map_for_object(mini_context* c, const mini_value* v);
+void mini_traverse(mini_context* c, const mini_value* v);
 #endif //_MINI_JSON_H__

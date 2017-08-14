@@ -19,7 +19,7 @@
 #define PUTC(c, ch)         do { *(char*)mini_context_push(c, sizeof(char)) = (ch); } while(0)
 #define PUTS(c, s, len)     memcpy(mini_context_push(c,len), s, len)
 
-void mini_show_value(mini_value* v) {
+void mini_show_value(const mini_value* v) {
     assert(v != NULL);
     size_t i;
     switch(v->type){
@@ -39,34 +39,11 @@ void mini_show_value(mini_value* v) {
                 break;
         case MINI_OBJECT : 
                 printf("{ ");
-                map_show(get_map(v), show_item);
+                if(get_map(v) != NULL)
+                    map_show(get_map(v), show_item);
                 printf(" }");
                 break;
     }
-}
-
-mini_value* mini_create_number(double n) {
-    mini_value* ret = (mini_value*)malloc(sizeof(mini_value));
-    mini_set_number(ret, n);
-    return ret;
-}
-
-mini_value* mini_create_string(const char* s) {
-    mini_value* ret = (mini_value*)malloc(sizeof(mini_value));
-    mini_set_string(ret, s, strlen(s));
-    return ret;
-}
-
-mini_value* mini_create_array() {
-    mini_value* ret = (mini_value*)malloc(sizeof(mini_value));
-    mini_init_array(ret);
-    return ret;
-}
-
-mini_value* mini_create_object() {
-    mini_value* ret = (mini_value*)malloc(sizeof(mini_value));
-    mini_init_object(ret);
-    return ret;
 }
 
 void mini_add_value_to_array(mini_value* arr, mini_value* v) {
@@ -297,6 +274,8 @@ static int mini_parse_array(mini_context* c, mini_value* v) {
 
 static int mini_parse_object(mini_context* c, mini_value* v) {
     size_t i,size;
+    mini_value key;
+    mini_value value;
     int ret;
 
     EXPECT(c, '{');
@@ -310,10 +289,9 @@ static int mini_parse_object(mini_context* c, mini_value* v) {
     }
     v->u.o.pmap = (Map *)malloc(sizeof(Map));
     *(v->u.o.pmap) = map();
+    v->type = MINI_OBJECT;
     size = 0;
     for(;;){
-        mini_value key;
-        mini_value value;
         mini_init(&key);
         mini_init(&value);
         /* parse key */
@@ -346,7 +324,6 @@ static int mini_parse_object(mini_context* c, mini_value* v) {
         }
         else if(*c->json == '}') {
             c->json++;
-            v->type = MINI_OBJECT;
             v->u.o.size = size;
             return MINI_PARSE_OK;
         }
@@ -355,6 +332,8 @@ static int mini_parse_object(mini_context* c, mini_value* v) {
             break;
         }
     }
+    mini_free(&key);
+    mini_free(&value);
     mini_free(v);
     v->type = MINI_NULL;
     return ret;
@@ -420,6 +399,11 @@ void mini_free(mini_value* v) {
 mini_type mini_get_type(const mini_value* v) {
     assert(v != NULL);
     return v->type;
+}
+
+void mini_set_type(mini_value* v, mini_type type) {
+    assert(v != NULL);
+    v->type = type;
 }
 
 int mini_get_boolean(const mini_value* v) {
@@ -530,26 +514,30 @@ static void mini_generate_string(mini_context* c, const char* s, size_t len) {
 
 static void mini_generate_value(mini_context* c, const mini_value* v) {
     size_t i;
+    size_t len;
     switch(v->type) {
         case MINI_NULL : PUTS(c, "null", 4);break;
         case MINI_TRUE : PUTS(c, "true", 4);break;
         case MINI_FALSE : PUTS(c, "false", 5);break;
         case MINI_NUMBER ://使用sprintf("%.17g",...)来把浮点数转换成文本
-                c->top -= 32 - sprintf(mini_context_push(c, 32), "%.17g", v->u.n);
+                len = sprintf(mini_context_push(c, 32), "%.17g", v->u.n);
+                c->top -= 32 - len;
+                break;
         case MINI_STRING : mini_generate_string(c, v->u.s.s, v->u.s.len); break;
         case MINI_ARRAY :
+                len = mini_get_array_size(v);
                 PUTC(c, '[');
-                for(i = 0; i < v->u.a.size; i++){
-                    if(i > 0)
-                        PUTC(c, ',');
+                for(i = 0; i < len; ++i){
+                    if(i > 0) PUTC(c, ',');
                     mini_generate_value(c, &v->u.a.e[i]);
                 }
                 PUTC(c, ']');
                 break;
         case MINI_OBJECT :
                 PUTC(c, '{');
-                /* 由于使用了map， 需要遍历 */
-                mini_traverse_map_for_object(c, v);
+                if(get_map(v) != NULL) //don`t hava {key:value}
+                    //mini_traverse_map_for_object(c, v);
+                    mini_traverse(c, v);
                 PUTC(c, '}');
                 break;
     }
@@ -570,7 +558,7 @@ int mini_generate(const mini_value* v, char** json, size_t* length) {
     return MINI_GENERATE_OK;
 }
 
-Map* get_map(mini_value* v) {
+Map* get_map(const mini_value* v) {
     assert(v != NULL && v->type == MINI_OBJECT);
     return v->u.o.pmap;
 }
@@ -599,39 +587,25 @@ void show_item(void *data) {
     printf("\n");
 }
 
-void mini_traverse_map_for_object(mini_context* c, const mini_value* v){
-    Map* pmap = v->u.o.pmap;
-    if(pmap->tree->root == NULL) {
-        printf("Empty tree!!");
-        return ;
-    }
-    Node *p = pmap->tree->root;
-    Node *tail = pmap->tree->tail;
-    size_t i = 0;
-    while(p->left != tail)
-        p = p->left;
-
-    while(p != NULL){
-        if(i > 0) PUTC(c, ',');
-        Item *pitem = (Item*)p->data;
-        mini_value *value = (mini_value*)(pitem->value);
-        mini_generate_string(c, pitem->key, strlen(pitem->key));
-        PUTC(c, ':');
-        mini_generate_value(c, value);
-        i++;
-        if(p->right != tail)
-        {
-            p = p->right;
-            while(p->left != tail) p = p->left;
-        }
-        else{
-            Node* tmp = p->parent;
-            while(tmp != NULL && tmp->right == p)
-            {
-                p = tmp;
-                tmp = p->parent;
-            }
-            p = tmp;
-        }
-    }
+void traverse_map_to_do(mini_context* c, void *data, size_t* i) {
+    if(*i > 0) PUTC(c, ',');
+    Item *pitem = (Item*)data;
+    mini_value* val = (mini_value*)pitem->value;
+    mini_generate_string(c, pitem->key, strlen(pitem->key));
+    PUTC(c, ':');
+    mini_generate_value(c, val);
+    *i += 1;
 }
+
+void _traverse(Node* p, Node* tail, mini_context* c, size_t* i, void(*func)(mini_context* , void *, size_t*)) {
+    if(p->left != tail) _traverse(p->left, tail, c, i, func);
+    func(c, p->data, i);
+    if(p->right != tail) _traverse(p->right, tail, c, i, func);
+}
+
+void mini_traverse(mini_context* c, const mini_value* v){
+    Map* pmap = get_map(v);
+    size_t i = 0;
+    _traverse(pmap->tree->root, pmap->tree->tail, c, &i, traverse_map_to_do);
+}
+
