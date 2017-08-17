@@ -26,8 +26,8 @@ void mini_show_value(const mini_value* v) {
         case MINI_NULL : printf("null"); break;
         case MINI_TRUE : printf("true"); break;
         case MINI_FALSE : printf("false"); break;
-        case MINI_NUMBER : printf(" %f ", mini_get_number(v)); break;
-        case MINI_STRING : printf(" %s ", mini_get_string(v)); break;
+        case MINI_NUMBER : printf("%f", mini_get_number(v)); break;
+        case MINI_STRING : printf("\"%s\"", mini_get_string(v)); break;
         case MINI_ARRAY : 
                 printf("[ ");
                 size_t size = mini_get_array_size(v);
@@ -48,25 +48,47 @@ void mini_show_value(const mini_value* v) {
 
 void mini_add_value_to_array(mini_value* arr, mini_value* v) {
     assert(arr != NULL && v != NULL && arr->type == MINI_ARRAY);
+    mini_value* tmp = mini_backup(v);
     size_t size = mini_get_array_size(arr);
     if(size == 0){
-        arr->u.a.e = v;
+        arr->u.a.e = tmp;
     }
     else{
         arr->u.a.e = (mini_value*)realloc(arr->u.a.e, sizeof(mini_value) * (size+1));
-        memcpy(arr->u.a.e+size, v, sizeof(mini_value));
+        memcpy(arr->u.a.e+size, tmp, sizeof(mini_value));
+        free((void*)tmp);
     }
     arr->u.a.size += 1;
 }
 
-void mini_add_value_to_object(mini_value* obj, mini_value* key, mini_value* value) {
-    assert(obj != NULL && obj->type == MINI_OBJECT && key != NULL && value != NULL);
-    if(get_map(obj) == NULL){
+void mini_add_value_to_object(mini_value* obj, mini_value* key, mini_value* val) {
+    assert(obj != NULL && obj->type == MINI_OBJECT && key != NULL && val != NULL);
+    if(obj->u.o.pmap == NULL){
         mini_init_object(obj);
     }
-    Item* pitem = new_item(mini_get_string(key), value);
-    add_item(get_map(obj), pitem);
+    mini_value *mkey = mini_backup(key);
+    mini_value *mval = mini_backup(val);
+    Item* pitem = new_item(mini_get_string(mkey), mval);
+    add_item(obj->u.o.pmap, pitem);
+    free(mkey);
+    free(mval);
     obj->u.o.size += 1;
+}
+
+// for deep copy
+mini_value* mini_backup(mini_value* v){
+    char *tmp_json = NULL;
+    mini_value* ret = NULL;
+    size_t len;
+    if(MINI_GENERATE_OK == mini_generate(v, &tmp_json, &len)){
+        ret = (mini_value*)malloc(sizeof(mini_value));
+        if(MINI_PARSE_OK != mini_parse(ret, tmp_json)) {
+            free(ret);
+            ret = NULL;
+        }
+    }
+    if(tmp_json != NULL) free(tmp_json);
+    return ret;
 }
 
 static void* mini_context_push(mini_context* c, size_t size) {
@@ -172,8 +194,8 @@ static void mini_encode_utf8(mini_context* c, unsigned int u){
 
 
 #define STRING_ERROR(ret) do { c->top = head; return ret; } while(0)
-static int mini_parse_string(mini_context* c, mini_value* v) {
-    size_t head = c->top, len;
+static int mini_parse_string_raw(mini_context* c, char** str, size_t* len) {
+    size_t head = c->top;
     unsigned int u, u2;
     const char* p;
     EXPECT(c, '\"');
@@ -182,8 +204,8 @@ static int mini_parse_string(mini_context* c, mini_value* v) {
         char ch = *p++;
         switch (ch) {
             case '\"':
-                len = c->top - head;
-                mini_set_string(v, (const char*)mini_context_pop(c, len), len);
+                *len = c->top - head;
+                *str = mini_context_pop(c, *len);
                 c->json = p;
                 return MINI_PARSE_OK;
             case '\\':
@@ -225,6 +247,15 @@ static int mini_parse_string(mini_context* c, mini_value* v) {
                 PUTC(c, ch);
         }
     }
+}
+
+static int mini_parse_string(mini_context* c, mini_value* v){
+    int ret;
+    char* s;
+    size_t len;
+    if((ret = mini_parse_string_raw(c, &s, &len)) == MINI_PARSE_OK)
+        mini_set_string(v, s, len);
+    return ret;
 }
 
 static int mini_parse_value(mini_context* c, mini_value* v);/* forward declare */

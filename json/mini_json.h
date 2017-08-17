@@ -42,7 +42,6 @@ enum {
     MINI_GENERATE_OK
 };
 
-
 /*****************************************
  *
  *              interface
@@ -55,6 +54,8 @@ void mini_add_value_to_object(mini_value* obj, mini_value* key, mini_value* valu
 int mini_parse(mini_value* v, const char* json);
 int mini_generate(const mini_value* v, char** json, size_t* length);
 void mini_free(mini_value* v);
+//for deep copy
+mini_value* mini_backup(mini_value* v);
 
 
 #define mini_init(v) do { (v)->type = MINI_NULL; } while(0)
