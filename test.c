@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "mini_json.h"
+#include "./json/mini_json.h"
 
 static int main_ret = 0;
 static int test_count = 0;
